@@ -41,7 +41,7 @@ The login form verifies the user by User ID and password. Successful users are r
    mysql -u root -p < schema.sql
    ```
 
-4. Create your local environment file from the sample and update the values for your machine:
+4. Create your local environment file from the sample and update the values for your machine. The Flask app loads this `.env` file automatically at startup:
 
    ```bash
    cp .env.example .env
@@ -58,6 +58,8 @@ The login form verifies the user by User ID and password. Successful users are r
    ADMIN_ID=admin
    ADMIN_PASSWORD=change-this-admin-password
    ```
+
+   `MYSQL_PASSWORD` must match the password you use for the same MySQL user in MySQL Workbench. After changing `.env`, stop and restart the Flask app so the new value is loaded.
 
 5. Run the application:
 

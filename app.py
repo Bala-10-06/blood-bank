@@ -1,10 +1,15 @@
 import os
 from typing import Any, Dict
 
+from dotenv import load_dotenv
+
 from flask import Flask, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from validation import BLOOD_GROUPS, validate_registration
+
+
+load_dotenv()
 
 
 def create_app() -> Flask:
@@ -28,7 +33,7 @@ def create_app() -> Flask:
             try:
                 save_user(form)
             except Exception as exc:
-                flash(f"Registration failed: {exc}", "error")
+                flash(f"Registration failed: {format_database_error(exc)}", "error")
                 return render_template("register.html", blood_groups=BLOOD_GROUPS, form=form)
 
             flash("Registration successful. Please login.", "success")
@@ -72,12 +77,27 @@ def create_app() -> Flask:
 def get_db_connection():
     import mysql.connector
 
+    password = os.environ.get("MYSQL_PASSWORD")
+    if password is None:
+        password = os.environ.get("DB_PASSWORD", "")
+
     return mysql.connector.connect(
         host=os.environ.get("MYSQL_HOST", "localhost"),
         user=os.environ.get("MYSQL_USER", "root"),
-        password=os.environ.get("MYSQL_PASSWORD", ""),
+        password=password,
         database=os.environ.get("MYSQL_DATABASE", "blood_bank"),
     )
+
+
+def format_database_error(exc: Exception) -> str:
+    message = str(exc)
+    if "1045" in message and "using password: NO" in message:
+        return (
+            "MySQL rejected the connection because no password was sent. "
+            "Put your Workbench password in MYSQL_PASSWORD in the .env file, "
+            "then restart the Flask app."
+        )
+    return message
 
 
 def save_user(form: Dict[str, Any]) -> None:
