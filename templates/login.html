@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Login Module</h2>
+    <form method="post" action="{{ url_for('login') }}">
+        <label for="user_id">User ID</label>
+        <input id="user_id" name="user_id" type="text" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+
+        <button type="submit">Login</button>
+    </form>
+    <p>New donor? <a href="{{ url_for('register') }}">Register here</a></p>
+</section>
+{% endblock %}
