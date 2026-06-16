@@ -41,14 +41,22 @@ The login form verifies the user by User ID and password. Successful users are r
    mysql -u root -p < schema.sql
    ```
 
-4. Configure database environment variables if your MySQL settings differ from the defaults:
+4. Create your local environment file from the sample and update the values for your machine:
 
    ```bash
-   export MYSQL_HOST=localhost
-   export MYSQL_USER=root
-   export MYSQL_PASSWORD=your_password
-   export MYSQL_DATABASE=blood_bank
-   export SECRET_KEY=replace-this-secret
+   cp .env.example .env
+   ```
+
+   The sample includes database settings, a Flask `SECRET_KEY`, and admin credentials:
+
+   ```bash
+   MYSQL_HOST=localhost
+   MYSQL_USER=root
+   MYSQL_PASSWORD=your_database_password
+   MYSQL_DATABASE=blood_bank
+   SECRET_KEY=replace-this-secret
+   ADMIN_ID=admin
+   ADMIN_PASSWORD=change-this-admin-password
    ```
 
 5. Run the application:
