@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2>Register Module</h2>
+    <form method="post" action="{{ url_for('register') }}">
+        <label for="user_id">User ID</label>
+        <input id="user_id" name="user_id" type="text" value="{{ form.get('user_id', '') }}" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+
+        <label for="aadhar">Aadhar Number</label>
+        <input id="aadhar" name="aadhar" type="text" minlength="12" maxlength="12" pattern="[0-9]{12}" value="{{ form.get('aadhar', '') }}" required>
+
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" value="{{ form.get('name', '') }}" required>
+
+        <label for="blood_group">Blood Group</label>
+        <select id="blood_group" name="blood_group" required>
+            <option value="">Select blood group</option>
+            {% for group in blood_groups %}
+                <option value="{{ group }}" {% if form.get('blood_group') == group %}selected{% endif %}>{{ group }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="age">Age</label>
+        <input id="age" name="age" type="number" min="18" max="55" value="{{ form.get('age', '') }}" required>
+
+        <label for="height">Height (cm)</label>
+        <input id="height" name="height" type="number" min="120" max="220" step="0.1" value="{{ form.get('height', '') }}" required>
+
+        <label for="weight">Weight (kg)</label>
+        <input id="weight" name="weight" type="number" min="45" max="200" step="0.1" value="{{ form.get('weight', '') }}" required>
+
+        <label for="address">Address</label>
+        <textarea id="address" name="address" required>{{ form.get('address', '') }}</textarea>
+
+        <label for="phone_number">Phone Number</label>
+        <input id="phone_number" name="phone_number" type="tel" minlength="10" maxlength="10" pattern="[0-9]{10}" value="{{ form.get('phone_number', '') }}" required>
+
+        <label>Any Bad Habits?</label>
+        <div class="inline-options">
+            <label><input name="bad_habits" type="radio" value="Yes" {% if form.get('bad_habits') == 'Yes' %}checked{% endif %} required> Yes</label>
+            <label><input name="bad_habits" type="radio" value="No" {% if form.get('bad_habits', 'No') == 'No' %}checked{% endif %}> No</label>
+        </div>
+
+        <button type="submit">Register</button>
+    </form>
+    <p>Already registered? <a href="{{ url_for('login') }}">Login here</a></p>
+</section>
+{% endblock %}
