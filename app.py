@@ -46,7 +46,11 @@ def create_app() -> Flask:
         if request.method == "POST":
             user_id = request.form.get("user_id", "").strip()
             password = request.form.get("password", "")
-            user = find_user(user_id)
+            try:
+                user = find_user(user_id)
+            except Exception as exc:
+                flash(f"Login failed: {format_database_error(exc)}", "error")
+                return render_template("login.html")
 
             if user and check_password_hash(user["password_hash"], password):
                 session["user_id"] = user_id
@@ -77,16 +81,32 @@ def create_app() -> Flask:
 def get_db_connection():
     import mysql.connector
 
+    return mysql.connector.connect(**get_database_config())
+
+
+def get_database_config() -> Dict[str, Any]:
+    """Build the MySQL connection settings from environment variables."""
     password = os.environ.get("MYSQL_PASSWORD")
     if password is None:
         password = os.environ.get("DB_PASSWORD", "")
 
-    return mysql.connector.connect(
-        host=os.environ.get("MYSQL_HOST", "localhost"),
-        user=os.environ.get("MYSQL_USER", "root"),
-        password=password,
-        database=os.environ.get("MYSQL_DATABASE", "blood_bank"),
-    )
+    config: Dict[str, Any] = {
+        "host": os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "user": os.environ.get("MYSQL_USER", "root"),
+        "password": password,
+        "database": os.environ.get("MYSQL_DATABASE", "blood_bank"),
+        "port": int(os.environ.get("MYSQL_PORT", "3306")),
+    }
+
+    unix_socket = os.environ.get("MYSQL_UNIX_SOCKET")
+    if unix_socket:
+        config["unix_socket"] = unix_socket
+
+    auth_plugin = os.environ.get("MYSQL_AUTH_PLUGIN")
+    if auth_plugin:
+        config["auth_plugin"] = auth_plugin
+
+    return config
 
 
 def format_database_error(exc: Exception) -> str:
@@ -97,6 +117,14 @@ def format_database_error(exc: Exception) -> str:
             "Put your Workbench password in MYSQL_PASSWORD in the .env file, "
             "then restart the Flask app."
         )
+    if "2003" in message or "Can't connect to MySQL server" in message:
+        return (
+            "Could not connect to the MySQL server. Check that MySQL is running "
+            "and that MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, and "
+            "MYSQL_DATABASE in your .env file match your local setup."
+        )
+    if "1049" in message or "Unknown database" in message:
+        return "The MySQL database was not found. Run `mysql -u root -p < schema.sql` first."
     return message
 
 
