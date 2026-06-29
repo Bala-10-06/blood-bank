@@ -2,29 +2,41 @@
     box-sizing: border-box;
 }
 
+html {
+    min-width: 320px;
+}
+
 body {
     margin: 0;
     background: #f7eef0;
     color: #2f2f2f;
     font-family: Arial, sans-serif;
+    line-height: 1.5;
 }
 
 .container {
-    max-width: 760px;
+    width: min(100%, 1120px);
     margin: 0 auto;
-    padding: 32px 16px;
+    padding: clamp(18px, 4vw, 36px) clamp(12px, 4vw, 24px);
 }
 
 h1 {
     color: #a40f24;
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
     text-align: center;
+}
+
+h2,
+h3 {
+    line-height: 1.2;
 }
 
 .card {
     background: #ffffff;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    padding: 24px;
+    padding: clamp(18px, 4vw, 24px);
+    min-width: 0;
 }
 
 form {
@@ -39,11 +51,14 @@ button {
     border: 1px solid #c9c9c9;
     border-radius: 8px;
     font: inherit;
+    max-width: 100%;
     padding: 10px;
+    width: 100%;
 }
 
 textarea {
     min-height: 90px;
+    resize: vertical;
 }
 
 button,
@@ -67,7 +82,18 @@ button:hover,
 
 .inline-options {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+}
+
+.inline-options label {
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+}
+
+.inline-options input {
+    width: auto;
 }
 
 .message {
@@ -91,9 +117,10 @@ button:hover,
     border-radius: 16px;
     color: #ffffff;
     display: flex;
+    gap: 20px;
     justify-content: space-between;
     margin-bottom: 20px;
-    padding: 28px;
+    padding: clamp(20px, 5vw, 32px);
 }
 
 .dashboard-hero h2,
@@ -102,8 +129,9 @@ button:hover,
 }
 
 .dashboard-hero h2 {
-    font-size: 2rem;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
     margin: 6px 0;
+    overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -116,6 +144,7 @@ button:hover,
 .button-link.secondary {
     background: #ffffff;
     color: #a40f24;
+    flex: 0 0 auto;
 }
 
 .stats-grid,
@@ -126,11 +155,11 @@ button:hover,
 }
 
 .stats-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .dashboard-grid {
-    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
 }
 
 .stat-card {
@@ -138,7 +167,8 @@ button:hover,
     border-left: 5px solid #c5162d;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-    padding: 20px;
+    padding: clamp(16px, 3vw, 20px);
+    min-width: 0;
 }
 
 .stat-value,
@@ -148,13 +178,14 @@ button:hover,
 
 .stat-value {
     color: #a40f24;
-    font-size: 2rem;
+    font-size: clamp(1.7rem, 6vw, 2.25rem);
     font-weight: 800;
+    overflow-wrap: anywhere;
 }
 
 .stat-value.small {
-    font-size: 1.2rem;
-    line-height: 2.4rem;
+    font-size: clamp(1rem, 4vw, 1.2rem);
+    line-height: 1.4;
 }
 
 .stat-label {
@@ -165,7 +196,7 @@ button:hover,
 .profile-list {
     display: grid;
     gap: 14px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     margin: 0;
 }
 
@@ -190,6 +221,7 @@ button:hover,
 
 .profile-list dd {
     margin: 0;
+    overflow-wrap: anywhere;
 }
 
 .blood-group-list {
@@ -200,6 +232,7 @@ button:hover,
 .blood-group-row {
     align-items: center;
     display: flex;
+    gap: 12px;
     justify-content: space-between;
 }
 
@@ -218,10 +251,12 @@ button:hover,
 
 .table-wrap {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 table {
     border-collapse: collapse;
+    min-width: 620px;
     width: 100%;
 }
 
@@ -230,6 +265,7 @@ td {
     border-bottom: 1px solid #eeeeee;
     padding: 12px 10px;
     text-align: left;
+    white-space: nowrap;
 }
 
 th {
@@ -239,10 +275,6 @@ th {
 }
 
 @media (max-width: 820px) {
-    .container {
-        max-width: 100%;
-    }
-
     .dashboard-hero,
     .dashboard-grid {
         display: block;
@@ -252,18 +284,27 @@ th {
         margin-top: 18px;
     }
 
-    .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
     .dashboard-grid .card + .card {
         margin-top: 20px;
     }
 }
 
 @media (max-width: 560px) {
-    .stats-grid,
-    .profile-list {
-        grid-template-columns: 1fr;
+    .container {
+        padding-inline: 10px;
+    }
+
+    .dashboard-hero {
+        border-radius: 12px;
+    }
+
+    .button-link,
+    button {
+        width: 100%;
+    }
+
+    th,
+    td {
+        padding: 10px 8px;
     }
 }
