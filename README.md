@@ -24,19 +24,22 @@ Passwords are stored as secure hashes rather than plain text.
 
 ### Login module
 
-The login form verifies the user by User ID and password. Successful users are redirected to a dashboard.
+The login form verifies donors by User ID and password. Successful donors are redirected to their personal dashboard. Admin credentials are read from `ADMIN_ID` and `ADMIN_PASSWORD` in the environment and redirect to the admin module.
 
 ### Dashboard module
 
-The dashboard reads live MySQL donor data to show:
+The donor dashboard reads live MySQL donor data but only displays the profile for the currently logged-in donor.
+
+### Admin module
+
+The admin module is available at `/admin` after logging in with the configured admin credentials. It can access all donor data and displays:
 
 - Total registered donors
 - Donors marked with healthy habits
 - Average donor age
 - Latest registration date
-- The logged-in donor profile
 - Donor counts by blood group
-- The five most recent donor registrations
+- A table of all donor records
 
 ## Setup
 

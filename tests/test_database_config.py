@@ -82,6 +82,13 @@ def test_empty_dashboard_data_contains_safe_defaults():
         "name": "Test Donor",
         "user_id": "donor-1",
         "profile": None,
+    }
+
+
+def test_empty_admin_dashboard_data_contains_safe_defaults():
+    from app import empty_admin_dashboard_data
+
+    assert empty_admin_dashboard_data() == {
         "stats": {
             "total_donors": 0,
             "eligible_donors": 0,
@@ -89,11 +96,21 @@ def test_empty_dashboard_data_contains_safe_defaults():
             "latest_registration": None,
         },
         "blood_groups": [],
-        "recent_donors": [],
+        "donors": [],
     }
 
 
-def test_dashboard_renders_mysql_summary(monkeypatch):
+def test_admin_login_uses_environment_credentials(monkeypatch):
+    from app import is_admin_login
+
+    monkeypatch.setenv("ADMIN_ID", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD", "secret-admin")
+
+    assert is_admin_login("admin", "secret-admin")
+    assert not is_admin_login("admin", "wrong")
+
+
+def test_dashboard_renders_only_logged_in_donor_profile(monkeypatch):
     from app import app
 
     def fake_dashboard_data(user_id):
@@ -109,15 +126,8 @@ def test_dashboard_renders_mysql_summary(monkeypatch):
                 "phone_number": "1234567890",
                 "bad_habits": "No",
                 "address": "Main Street",
+                "created_at": None,
             },
-            "stats": {
-                "total_donors": 4,
-                "eligible_donors": 3,
-                "average_age": 29.5,
-                "latest_registration": None,
-            },
-            "blood_groups": [{"blood_group": "O+", "donor_count": 2}],
-            "recent_donors": [],
         }
 
     monkeypatch.setattr("app.get_dashboard_data", fake_dashboard_data)
@@ -130,7 +140,53 @@ def test_dashboard_renders_mysql_summary(monkeypatch):
         response = client.get("/dashboard")
 
     assert response.status_code == 200
-    assert b"MySQL-powered dashboard" in response.data
-    assert b"Registered donors" in response.data
-    assert b"Donors by blood group" in response.data
+    assert b"Personal donor dashboard" in response.data
+    assert b"Your donor profile" in response.data
+    assert b"Registered donors" not in response.data
+    assert b"Donors by blood group" not in response.data
+    assert b"Test Donor" in response.data
+
+
+def test_admin_dashboard_renders_all_donor_data(monkeypatch):
+    from app import app
+
+    monkeypatch.setattr(
+        "app.get_admin_dashboard_data",
+        lambda: {
+            "stats": {
+                "total_donors": 2,
+                "eligible_donors": 1,
+                "average_age": 30,
+                "latest_registration": None,
+            },
+            "blood_groups": [{"blood_group": "A+", "donor_count": 1}],
+            "donors": [
+                {
+                    "user_id": "donor-1",
+                    "aadhar": "123456789012",
+                    "name": "Test Donor",
+                    "blood_group": "A+",
+                    "age": 30,
+                    "height": 170,
+                    "weight": 70,
+                    "address": "Main Street",
+                    "phone_number": "1234567890",
+                    "bad_habits": "No",
+                    "created_at": None,
+                }
+            ],
+        },
+    )
+
+    with app.test_client() as client:
+        with client.session_transaction() as session:
+            session["user_id"] = "admin"
+            session["name"] = "Administrator"
+            session["role"] = "admin"
+
+        response = client.get("/admin")
+
+    assert response.status_code == 200
+    assert b"Admin module" in response.data
+    assert b"All donor records" in response.data
     assert b"Test Donor" in response.data
