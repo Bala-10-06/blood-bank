@@ -78,11 +78,12 @@ def test_normalize_dashboard_stats_defaults_missing_values():
 def test_empty_dashboard_data_contains_safe_defaults():
     from app import empty_dashboard_data
 
-    assert empty_dashboard_data("donor-1", "Test Donor") == {
-        "name": "Test Donor",
-        "user_id": "donor-1",
-        "profile": None,
-    }
+    data = empty_dashboard_data("donor-1", "Test Donor")
+
+    assert data["name"] == "Test Donor"
+    assert data["user_id"] == "donor-1"
+    assert data["profile"] is None
+    assert data["eligibility"]["status"] == "Available"
 
 
 def test_empty_admin_dashboard_data_contains_safe_defaults():
@@ -97,6 +98,7 @@ def test_empty_admin_dashboard_data_contains_safe_defaults():
         },
         "blood_groups": [],
         "donors": [],
+        "filters": {"search": "", "blood_group": "", "availability": ""},
     }
 
 
@@ -125,9 +127,11 @@ def test_dashboard_renders_only_logged_in_donor_profile(monkeypatch):
                 "weight": 70,
                 "phone_number": "1234567890",
                 "bad_habits": "No",
+                "last_donated_at": None,
                 "address": "Main Street",
                 "created_at": None,
             },
+            "eligibility": {"status": "Available", "next_available_date": None},
         }
 
     monkeypatch.setattr("app.get_dashboard_data", fake_dashboard_data)
@@ -152,7 +156,7 @@ def test_admin_dashboard_renders_all_donor_data(monkeypatch):
 
     monkeypatch.setattr(
         "app.get_admin_dashboard_data",
-        lambda: {
+        lambda filters=None: {
             "stats": {
                 "total_donors": 2,
                 "eligible_donors": 1,
@@ -172,9 +176,13 @@ def test_admin_dashboard_renders_all_donor_data(monkeypatch):
                     "address": "Main Street",
                     "phone_number": "1234567890",
                     "bad_habits": "No",
+                    "last_donated_at": None,
+                    "donation_status": "Available",
+                    "next_available_date": None,
                     "created_at": None,
                 }
             ],
+            "filters": {"search": "", "blood_group": "", "availability": ""},
         },
     )
 
@@ -190,3 +198,27 @@ def test_admin_dashboard_renders_all_donor_data(monkeypatch):
     assert b"Admin module" in response.data
     assert b"All donor records" in response.data
     assert b"Test Donor" in response.data
+
+
+def test_donation_eligibility_uses_six_month_waiting_period():
+    from datetime import date
+
+    from app import add_months, get_donation_eligibility
+
+    recent = get_donation_eligibility(date.today())
+    old = get_donation_eligibility(date(2000, 1, 1))
+
+    assert recent["status"] == "Not available"
+    assert recent["next_available_date"] == add_months(date.today(), 6)
+    assert old["status"] == "Available"
+
+
+def test_admin_filters_build_specific_data_clause():
+    from app import build_admin_filter_clause
+
+    clause, params = build_admin_filter_clause({"search": "donor", "blood_group": "O+", "availability": "available"})
+
+    assert "user_id LIKE" in clause
+    assert "blood_group = %s" in clause
+    assert "DATE_ADD" in clause
+    assert params == ["%donor%", "%donor%", "%donor%", "%donor%", "O+"]

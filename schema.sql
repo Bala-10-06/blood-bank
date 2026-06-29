@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS donors (
     address TEXT NOT NULL,
     phone_number CHAR(10) NOT NULL,
     bad_habits ENUM('Yes', 'No') NOT NULL,
+    last_donated_at DATE NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_age CHECK (age BETWEEN 18 AND 55),
     CONSTRAINT chk_height CHECK (height BETWEEN 120 AND 220),

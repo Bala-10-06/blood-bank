@@ -19,11 +19,30 @@
             <div><dt>Weight</dt><dd>{{ profile.weight }} kg</dd></div>
             <div><dt>Phone</dt><dd>{{ profile.phone_number }}</dd></div>
             <div><dt>Bad habits</dt><dd>{{ profile.bad_habits }}</dd></div>
+            <div><dt>Last blood donation</dt><dd>{{ profile.last_donated_at.strftime('%d %b %Y') if profile.last_donated_at and profile.last_donated_at.strftime is defined else (profile.last_donated_at or 'Not updated') }}</dd></div>
+            <div><dt>Donation status</dt><dd>{{ eligibility.status }}</dd></div>
+            <div><dt>Next available date</dt><dd>{{ eligibility.next_available_date.strftime('%d %b %Y') if eligibility.next_available_date and eligibility.next_available_date.strftime is defined else 'Now' }}</dd></div>
             <div><dt>Registered</dt><dd>{{ profile.created_at.strftime('%d %b %Y') if profile.created_at.strftime is defined else profile.created_at }}</dd></div>
             <div class="full-width"><dt>Address</dt><dd>{{ profile.address }}</dd></div>
         </dl>
     {% else %}
         <p>No donor profile was found for this login.</p>
     {% endif %}
+</section>
+
+<section class="card recent-card">
+    <h3>Update last blood donation date</h3>
+    <p>Keep this date current so the blood bank can calculate whether you are available to donate within the 6-month waiting period.</p>
+    <form method="post" class="inline-form">
+        <label for="last_donated_at">Last blood donation date</label>
+        <input
+            id="last_donated_at"
+            name="last_donated_at"
+            type="date"
+            value="{{ profile.last_donated_at.isoformat() if profile and profile.last_donated_at and profile.last_donated_at.isoformat is defined else '' }}"
+            max="{{ current_date if current_date is defined else '' }}"
+        >
+        <button type="submit">Update donation date</button>
+    </form>
 </section>
 {% endblock %}

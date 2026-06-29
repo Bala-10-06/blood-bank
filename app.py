@@ -1,4 +1,5 @@
 import os
+from datetime import date, datetime
 from typing import Any, Dict
 
 from dotenv import load_dotenv
@@ -71,11 +72,22 @@ def create_app() -> Flask:
 
         return render_template("login.html")
 
-    @app.route("/dashboard")
+    @app.route("/dashboard", methods=["GET", "POST"])
     def dashboard():
         if "user_id" not in session:
             flash("Please login first.", "error")
             return redirect(url_for("login"))
+
+        if request.method == "POST":
+            try:
+                update_last_donation_date(session["user_id"], request.form.get("last_donated_at", ""))
+            except ValueError as exc:
+                flash(str(exc), "error")
+            except Exception as exc:
+                flash(f"Last donation date could not be updated: {format_database_error(exc)}", "error")
+            else:
+                flash("Last donation date updated successfully.", "success")
+            return redirect(url_for("dashboard"))
 
         try:
             dashboard_data = get_dashboard_data(session["user_id"])
@@ -83,7 +95,8 @@ def create_app() -> Flask:
             flash(f"Dashboard data could not be loaded: {format_database_error(exc)}", "error")
             dashboard_data = empty_dashboard_data(session.get("user_id"), session.get("name"))
 
-        return render_template("dashboard.html", **dashboard_data)
+        dashboard_data.setdefault("eligibility", get_donation_eligibility(None))
+        return render_template("dashboard.html", current_date=date.today().isoformat(), **dashboard_data)
 
     @app.route("/admin")
     def admin_dashboard():
@@ -91,13 +104,15 @@ def create_app() -> Flask:
             flash("Admin access is required.", "error")
             return redirect(url_for("login"))
 
+        filters = get_admin_filters(request.args)
+
         try:
-            admin_data = get_admin_dashboard_data()
+            admin_data = get_admin_dashboard_data(filters)
         except Exception as exc:
             flash(f"Admin data could not be loaded: {format_database_error(exc)}", "error")
-            admin_data = empty_admin_dashboard_data()
+            admin_data = empty_admin_dashboard_data(filters)
 
-        return render_template("admin.html", **admin_data)
+        return render_template("admin.html", blood_group_options=BLOOD_GROUPS, **admin_data)
 
     @app.route("/logout")
     def logout():
@@ -200,6 +215,7 @@ def empty_dashboard_data(user_id: str, name: str | None = None) -> Dict[str, Any
         "name": name,
         "user_id": user_id,
         "profile": None,
+        "eligibility": get_donation_eligibility(None),
     }
 
 
@@ -209,7 +225,7 @@ def get_dashboard_data(user_id: str) -> Dict[str, Any]:
     try:
         cursor.execute(
             """
-            SELECT user_id, name, blood_group, age, height, weight, address, phone_number, bad_habits, created_at
+            SELECT user_id, name, blood_group, age, height, weight, address, phone_number, bad_habits, last_donated_at, created_at
             FROM donors
             WHERE user_id = %s
             """,
@@ -221,13 +237,14 @@ def get_dashboard_data(user_id: str) -> Dict[str, Any]:
             "name": profile["name"] if profile else None,
             "user_id": user_id,
             "profile": profile,
+            "eligibility": get_donation_eligibility(profile.get("last_donated_at") if profile else None),
         }
     finally:
         cursor.close()
         connection.close()
 
 
-def empty_admin_dashboard_data() -> Dict[str, Any]:
+def empty_admin_dashboard_data(filters: Dict[str, str] | None = None) -> Dict[str, Any]:
     return {
         "stats": {
             "total_donors": 0,
@@ -237,10 +254,13 @@ def empty_admin_dashboard_data() -> Dict[str, Any]:
         },
         "blood_groups": [],
         "donors": [],
+        "filters": filters or get_admin_filters({}),
     }
 
 
-def get_admin_dashboard_data() -> Dict[str, Any]:
+def get_admin_dashboard_data(filters: Dict[str, str] | None = None) -> Dict[str, Any]:
+    filters = filters or get_admin_filters({})
+    where_clause, params = build_admin_filter_clause(filters)
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
     try:
@@ -248,7 +268,7 @@ def get_admin_dashboard_data() -> Dict[str, Any]:
             """
             SELECT
                 COUNT(*) AS total_donors,
-                SUM(CASE WHEN bad_habits = 'No' THEN 1 ELSE 0 END) AS eligible_donors,
+                SUM(CASE WHEN bad_habits = 'No' AND (last_donated_at IS NULL OR DATE_ADD(last_donated_at, INTERVAL 6 MONTH) <= CURDATE()) THEN 1 ELSE 0 END) AS eligible_donors,
                 ROUND(AVG(age), 1) AS average_age,
                 MAX(created_at) AS latest_registration
             FROM donors
@@ -268,21 +288,136 @@ def get_admin_dashboard_data() -> Dict[str, Any]:
 
         cursor.execute(
             """
-            SELECT user_id, aadhar, name, blood_group, age, height, weight, address, phone_number, bad_habits, created_at
+            SELECT user_id, aadhar, name, blood_group, age, height, weight, address, phone_number, bad_habits, last_donated_at, created_at
             FROM donors
+            {where_clause}
             ORDER BY created_at DESC, id DESC
-            """
+            """.format(where_clause=where_clause),
+            tuple(params),
         )
         donors = cursor.fetchall()
 
         return {
             "stats": normalize_dashboard_stats(stats),
             "blood_groups": blood_groups,
-            "donors": donors,
+            "donors": [enrich_donor_availability(donor) for donor in donors],
+            "filters": filters,
         }
     finally:
         cursor.close()
         connection.close()
+
+
+def parse_iso_date(value: str) -> date:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("Enter the last donation date in YYYY-MM-DD format.") from exc
+
+
+def add_months(original: date, months: int) -> date:
+    month = original.month - 1 + months
+    year = original.year + month // 12
+    month = month % 12 + 1
+    month_lengths = [
+        31,
+        29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ]
+    return original.replace(year=year, month=month, day=min(original.day, month_lengths[month - 1]))
+
+
+def get_donation_eligibility(last_donated_at: Any) -> Dict[str, Any]:
+    if not last_donated_at:
+        return {"available": True, "next_available_date": None, "status": "Available"}
+
+    if isinstance(last_donated_at, datetime):
+        last_donated_at = last_donated_at.date()
+    elif isinstance(last_donated_at, str):
+        last_donated_at = parse_iso_date(last_donated_at)
+
+    next_available_date = add_months(last_donated_at, 6)
+    available = next_available_date <= date.today()
+    return {
+        "available": available,
+        "next_available_date": next_available_date,
+        "status": "Available" if available else "Not available",
+    }
+
+
+def update_last_donation_date(user_id: str, last_donated_at: str) -> None:
+    last_donated_at = last_donated_at.strip()
+    if not last_donated_at:
+        parsed_date = None
+    else:
+        parsed_date = parse_iso_date(last_donated_at)
+        if parsed_date > date.today():
+            raise ValueError("Last donation date cannot be in the future.")
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            "UPDATE donors SET last_donated_at = %s WHERE user_id = %s",
+            (parsed_date, user_id.strip()),
+        )
+        connection.commit()
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def get_admin_filters(args: Any) -> Dict[str, str]:
+    return {
+        "search": args.get("search", "").strip(),
+        "blood_group": args.get("blood_group", "").strip(),
+        "availability": args.get("availability", "").strip(),
+    }
+
+
+def build_admin_filter_clause(filters: Dict[str, str]) -> tuple[str, list[Any]]:
+    clauses = []
+    params: list[Any] = []
+
+    if filters.get("search"):
+        clauses.append("(user_id LIKE %s OR name LIKE %s OR phone_number LIKE %s OR aadhar LIKE %s)")
+        search = f"%{filters['search']}%"
+        params.extend([search, search, search, search])
+
+    if filters.get("blood_group") in BLOOD_GROUPS:
+        clauses.append("blood_group = %s")
+        params.append(filters["blood_group"])
+
+    if filters.get("availability") == "available":
+        clauses.append(
+            "bad_habits = 'No' AND "
+            "(last_donated_at IS NULL OR DATE_ADD(last_donated_at, INTERVAL 6 MONTH) <= CURDATE())"
+        )
+    elif filters.get("availability") == "not_available":
+        clauses.append(
+            "(bad_habits = 'Yes' OR "
+            "(last_donated_at IS NOT NULL AND DATE_ADD(last_donated_at, INTERVAL 6 MONTH) > CURDATE()))"
+        )
+
+    if not clauses:
+        return "", params
+    return "WHERE " + " AND ".join(clauses), params
+
+
+def enrich_donor_availability(donor: Dict[str, Any]) -> Dict[str, Any]:
+    eligibility = get_donation_eligibility(donor.get("last_donated_at"))
+    donor["donation_status"] = "Not available" if donor.get("bad_habits") == "Yes" else eligibility["status"]
+    donor["next_available_date"] = None if donor.get("bad_habits") == "Yes" else eligibility["next_available_date"]
+    return donor
 
 
 def normalize_dashboard_stats(stats: Dict[str, Any]) -> Dict[str, Any]:

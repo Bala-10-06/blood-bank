@@ -312,3 +312,52 @@ th {
         padding: 10px 8px;
     }
 }
+
+.filter-card {
+    margin-bottom: 20px;
+}
+
+.filter-form {
+    align-items: end;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.button-link.outline {
+    border: 1px solid #c5162d;
+    margin-top: 8px;
+}
+
+.inline-form {
+    max-width: 420px;
+}
+
+.status-pill {
+    border-radius: 999px;
+    display: inline-block;
+    font-size: 0.85rem;
+    font-weight: bold;
+    padding: 5px 10px;
+}
+
+.status-pill.available {
+    background: #e4f7e8;
+    color: #17672a;
+}
+
+.status-pill.not-available {
+    background: #ffe1e6;
+    color: #8d0d1e;
+}
+
+@media (max-width: 560px) {
+    .filter-actions {
+        display: block;
+    }
+}
