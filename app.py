@@ -46,6 +46,14 @@ def create_app() -> Flask:
         if request.method == "POST":
             user_id = request.form.get("user_id", "").strip()
             password = request.form.get("password", "")
+
+            if is_admin_login(user_id, password):
+                session["user_id"] = user_id
+                session["name"] = "Administrator"
+                session["role"] = "admin"
+                flash("Admin login successful.", "success")
+                return redirect(url_for("admin_dashboard"))
+
             try:
                 user = find_user(user_id)
             except Exception as exc:
@@ -55,6 +63,7 @@ def create_app() -> Flask:
             if user and check_password_hash(user["password_hash"], password):
                 session["user_id"] = user_id
                 session["name"] = user["name"]
+                session["role"] = "donor"
                 flash("Login successful.", "success")
                 return redirect(url_for("dashboard"))
 
@@ -75,6 +84,20 @@ def create_app() -> Flask:
             dashboard_data = empty_dashboard_data(session.get("user_id"), session.get("name"))
 
         return render_template("dashboard.html", **dashboard_data)
+
+    @app.route("/admin")
+    def admin_dashboard():
+        if session.get("role") != "admin":
+            flash("Admin access is required.", "error")
+            return redirect(url_for("login"))
+
+        try:
+            admin_data = get_admin_dashboard_data()
+        except Exception as exc:
+            flash(f"Admin data could not be loaded: {format_database_error(exc)}", "error")
+            admin_data = empty_admin_dashboard_data()
+
+        return render_template("admin.html", **admin_data)
 
     @app.route("/logout")
     def logout():
@@ -166,19 +189,17 @@ def save_user(form: Dict[str, Any]) -> None:
         connection.close()
 
 
+def is_admin_login(user_id: str, password: str) -> bool:
+    admin_id = os.environ.get("ADMIN_ID", "admin")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    return bool(admin_password) and user_id.strip() == admin_id and password == admin_password
+
+
 def empty_dashboard_data(user_id: str, name: str | None = None) -> Dict[str, Any]:
     return {
         "name": name,
         "user_id": user_id,
         "profile": None,
-        "stats": {
-            "total_donors": 0,
-            "eligible_donors": 0,
-            "average_age": 0,
-            "latest_registration": None,
-        },
-        "blood_groups": [],
-        "recent_donors": [],
     }
 
 
@@ -196,6 +217,33 @@ def get_dashboard_data(user_id: str) -> Dict[str, Any]:
         )
         profile = cursor.fetchone()
 
+        return {
+            "name": profile["name"] if profile else None,
+            "user_id": user_id,
+            "profile": profile,
+        }
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def empty_admin_dashboard_data() -> Dict[str, Any]:
+    return {
+        "stats": {
+            "total_donors": 0,
+            "eligible_donors": 0,
+            "average_age": 0,
+            "latest_registration": None,
+        },
+        "blood_groups": [],
+        "donors": [],
+    }
+
+
+def get_admin_dashboard_data() -> Dict[str, Any]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
         cursor.execute(
             """
             SELECT
@@ -220,21 +268,17 @@ def get_dashboard_data(user_id: str) -> Dict[str, Any]:
 
         cursor.execute(
             """
-            SELECT name, blood_group, age, phone_number, created_at
+            SELECT user_id, aadhar, name, blood_group, age, height, weight, address, phone_number, bad_habits, created_at
             FROM donors
             ORDER BY created_at DESC, id DESC
-            LIMIT 5
             """
         )
-        recent_donors = cursor.fetchall()
+        donors = cursor.fetchall()
 
         return {
-            "name": profile["name"] if profile else None,
-            "user_id": user_id,
-            "profile": profile,
             "stats": normalize_dashboard_stats(stats),
             "blood_groups": blood_groups,
-            "recent_donors": recent_donors,
+            "donors": donors,
         }
     finally:
         cursor.close()

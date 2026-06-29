@@ -162,6 +162,10 @@ button:hover,
     grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
 }
 
+.dashboard-grid .admin-table {
+    min-width: 1120px;
+}
+
 .stat-card {
     background: #ffffff;
     border-left: 5px solid #c5162d;
