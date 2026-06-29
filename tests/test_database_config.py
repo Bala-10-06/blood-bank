@@ -222,3 +222,63 @@ def test_admin_filters_build_specific_data_clause():
     assert "blood_group = %s" in clause
     assert "DATE_ADD" in clause
     assert params == ["%donor%", "%donor%", "%donor%", "%donor%", "O+"]
+
+
+def test_database_error_formats_missing_last_donation_column():
+    assert "missing the last_donated_at column" in format_database_error(
+        Exception("1054 (42S22): Unknown column 'last_donated_at' in 'field list'")
+    )
+
+
+class FakeSchemaCursor:
+    def __init__(self, column_exists=False):
+        self.column_exists = column_exists
+        self.closed = False
+        self.queries = []
+
+    def execute(self, query, params=None):
+        self.queries.append((query, params))
+
+    def fetchone(self):
+        return {"Field": "last_donated_at"} if self.column_exists else None
+
+    def close(self):
+        self.closed = True
+
+
+class FakeSchemaConnection:
+    def __init__(self, column_exists=False):
+        self.cursor_obj = FakeSchemaCursor(column_exists)
+        self.committed = False
+
+    def cursor(self, *args, **kwargs):
+        return self.cursor_obj
+
+    def commit(self):
+        self.committed = True
+
+
+def test_ensure_donor_schema_adds_missing_last_donation_column():
+    from app import ensure_donor_schema
+
+    connection = FakeSchemaConnection(column_exists=False)
+
+    ensure_donor_schema(connection)
+
+    queries = [query for query, _ in connection.cursor_obj.queries]
+    assert "SHOW COLUMNS FROM donors LIKE %s" in queries
+    assert "ALTER TABLE donors ADD COLUMN last_donated_at DATE NULL AFTER bad_habits" in queries
+    assert connection.committed
+    assert connection.cursor_obj.closed
+
+
+def test_ensure_donor_schema_skips_existing_last_donation_column():
+    from app import ensure_donor_schema
+
+    connection = FakeSchemaConnection(column_exists=True)
+
+    ensure_donor_schema(connection)
+
+    queries = [query for query, _ in connection.cursor_obj.queries]
+    assert queries == ["SHOW COLUMNS FROM donors LIKE %s"]
+    assert not connection.committed
