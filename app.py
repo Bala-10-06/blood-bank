@@ -67,7 +67,14 @@ def create_app() -> Flask:
         if "user_id" not in session:
             flash("Please login first.", "error")
             return redirect(url_for("login"))
-        return render_template("dashboard.html", name=session.get("name"), user_id=session.get("user_id"))
+
+        try:
+            dashboard_data = get_dashboard_data(session["user_id"])
+        except Exception as exc:
+            flash(f"Dashboard data could not be loaded: {format_database_error(exc)}", "error")
+            dashboard_data = empty_dashboard_data(session.get("user_id"), session.get("name"))
+
+        return render_template("dashboard.html", **dashboard_data)
 
     @app.route("/logout")
     def logout():
@@ -157,6 +164,90 @@ def save_user(form: Dict[str, Any]) -> None:
     finally:
         cursor.close()
         connection.close()
+
+
+def empty_dashboard_data(user_id: str, name: str | None = None) -> Dict[str, Any]:
+    return {
+        "name": name,
+        "user_id": user_id,
+        "profile": None,
+        "stats": {
+            "total_donors": 0,
+            "eligible_donors": 0,
+            "average_age": 0,
+            "latest_registration": None,
+        },
+        "blood_groups": [],
+        "recent_donors": [],
+    }
+
+
+def get_dashboard_data(user_id: str) -> Dict[str, Any]:
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT user_id, name, blood_group, age, height, weight, address, phone_number, bad_habits, created_at
+            FROM donors
+            WHERE user_id = %s
+            """,
+            (user_id.strip(),),
+        )
+        profile = cursor.fetchone()
+
+        cursor.execute(
+            """
+            SELECT
+                COUNT(*) AS total_donors,
+                SUM(CASE WHEN bad_habits = 'No' THEN 1 ELSE 0 END) AS eligible_donors,
+                ROUND(AVG(age), 1) AS average_age,
+                MAX(created_at) AS latest_registration
+            FROM donors
+            """
+        )
+        stats = cursor.fetchone() or {}
+
+        cursor.execute(
+            """
+            SELECT blood_group, COUNT(*) AS donor_count
+            FROM donors
+            GROUP BY blood_group
+            ORDER BY FIELD(blood_group, 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')
+            """
+        )
+        blood_groups = cursor.fetchall()
+
+        cursor.execute(
+            """
+            SELECT name, blood_group, age, phone_number, created_at
+            FROM donors
+            ORDER BY created_at DESC, id DESC
+            LIMIT 5
+            """
+        )
+        recent_donors = cursor.fetchall()
+
+        return {
+            "name": profile["name"] if profile else None,
+            "user_id": user_id,
+            "profile": profile,
+            "stats": normalize_dashboard_stats(stats),
+            "blood_groups": blood_groups,
+            "recent_donors": recent_donors,
+        }
+    finally:
+        cursor.close()
+        connection.close()
+
+
+def normalize_dashboard_stats(stats: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "total_donors": stats.get("total_donors") or 0,
+        "eligible_donors": stats.get("eligible_donors") or 0,
+        "average_age": stats.get("average_age") or 0,
+        "latest_registration": stats.get("latest_registration"),
+    }
 
 
 def find_user(user_id: str):

@@ -26,6 +26,18 @@ Passwords are stored as secure hashes rather than plain text.
 
 The login form verifies the user by User ID and password. Successful users are redirected to a dashboard.
 
+### Dashboard module
+
+The dashboard reads live MySQL donor data to show:
+
+- Total registered donors
+- Donors marked with healthy habits
+- Average donor age
+- Latest registration date
+- The logged-in donor profile
+- Donor counts by blood group
+- The five most recent donor registrations
+
 ## Setup
 
 1. Create and activate a Python virtual environment.
