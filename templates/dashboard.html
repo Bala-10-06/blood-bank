@@ -1,8 +1,103 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card">
-    <h2>Welcome, {{ name }}</h2>
-    <p>You are logged in with User ID: <strong>{{ user_id }}</strong></p>
-    <a class="button-link" href="{{ url_for('logout') }}">Logout</a>
+<section class="dashboard-hero">
+    <div>
+        <p class="eyebrow">MySQL-powered dashboard</p>
+        <h2>Welcome, {{ name or "Donor" }}</h2>
+        <p>You are logged in with User ID: <strong>{{ user_id }}</strong></p>
+    </div>
+    <a class="button-link secondary" href="{{ url_for('logout') }}">Logout</a>
+</section>
+
+<section class="stats-grid" aria-label="Blood bank summary">
+    <article class="stat-card">
+        <span class="stat-value">{{ stats.total_donors }}</span>
+        <span class="stat-label">Registered donors</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-value">{{ stats.eligible_donors }}</span>
+        <span class="stat-label">Healthy-habit donors</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-value">{{ stats.average_age }}</span>
+        <span class="stat-label">Average donor age</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-value small">
+            {% if stats.latest_registration %}
+                {{ stats.latest_registration.strftime('%d %b %Y') if stats.latest_registration.strftime is defined else stats.latest_registration }}
+            {% else %}
+                No data
+            {% endif %}
+        </span>
+        <span class="stat-label">Latest registration</span>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+    <article class="card">
+        <h3>Your donor profile</h3>
+        {% if profile %}
+            <dl class="profile-list">
+                <div><dt>Blood group</dt><dd>{{ profile.blood_group }}</dd></div>
+                <div><dt>Age</dt><dd>{{ profile.age }} years</dd></div>
+                <div><dt>Height</dt><dd>{{ profile.height }} cm</dd></div>
+                <div><dt>Weight</dt><dd>{{ profile.weight }} kg</dd></div>
+                <div><dt>Phone</dt><dd>{{ profile.phone_number }}</dd></div>
+                <div><dt>Bad habits</dt><dd>{{ profile.bad_habits }}</dd></div>
+                <div class="full-width"><dt>Address</dt><dd>{{ profile.address }}</dd></div>
+            </dl>
+        {% else %}
+            <p>No donor profile was found for this login.</p>
+        {% endif %}
+    </article>
+
+    <article class="card">
+        <h3>Donors by blood group</h3>
+        {% if blood_groups %}
+            <div class="blood-group-list">
+                {% for group in blood_groups %}
+                    <div class="blood-group-row">
+                        <span>{{ group.blood_group }}</span>
+                        <strong>{{ group.donor_count }}</strong>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No blood group data is available yet.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="card recent-card">
+    <h3>Recent donor registrations</h3>
+    {% if recent_donors %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Blood group</th>
+                        <th>Age</th>
+                        <th>Phone</th>
+                        <th>Registered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for donor in recent_donors %}
+                        <tr>
+                            <td>{{ donor.name }}</td>
+                            <td>{{ donor.blood_group }}</td>
+                            <td>{{ donor.age }}</td>
+                            <td>{{ donor.phone_number }}</td>
+                            <td>{{ donor.created_at.strftime('%d %b %Y') if donor.created_at.strftime is defined else donor.created_at }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p>No recent registrations to show.</p>
+    {% endif %}
 </section>
 {% endblock %}
