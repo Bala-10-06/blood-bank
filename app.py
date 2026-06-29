@@ -170,6 +170,11 @@ def format_database_error(exc: Exception) -> str:
         )
     if "1049" in message or "Unknown database" in message:
         return "The MySQL database was not found. Run `mysql -u root -p < schema.sql` first."
+    if "1054" in message and "last_donated_at" in message:
+        return (
+            "The donors table is missing the last_donated_at column. "
+            "Restart the app so it can repair the schema, or run the ALTER TABLE command in SQL_RUN.md."
+        )
     return message
 
 
@@ -221,6 +226,7 @@ def empty_dashboard_data(user_id: str, name: str | None = None) -> Dict[str, Any
 
 def get_dashboard_data(user_id: str) -> Dict[str, Any]:
     connection = get_db_connection()
+    ensure_donor_schema(connection)
     cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
@@ -262,6 +268,7 @@ def get_admin_dashboard_data(filters: Dict[str, str] | None = None) -> Dict[str,
     filters = filters or get_admin_filters({})
     where_clause, params = build_admin_filter_clause(filters)
     connection = get_db_connection()
+    ensure_donor_schema(connection)
     cursor = connection.cursor(dictionary=True)
     try:
         cursor.execute(
@@ -306,6 +313,20 @@ def get_admin_dashboard_data(filters: Dict[str, str] | None = None) -> Dict[str,
     finally:
         cursor.close()
         connection.close()
+
+
+def ensure_donor_schema(connection: Any) -> None:
+    """Repair older donors tables so dashboards can read and update donation dates."""
+    cursor = connection.cursor()
+    try:
+        cursor.execute("SHOW COLUMNS FROM donors LIKE %s", ("last_donated_at",))
+        if cursor.fetchone():
+            return
+
+        cursor.execute("ALTER TABLE donors ADD COLUMN last_donated_at DATE NULL AFTER bad_habits")
+        connection.commit()
+    finally:
+        cursor.close()
 
 
 def parse_iso_date(value: str) -> date:
@@ -355,6 +376,7 @@ def get_donation_eligibility(last_donated_at: Any) -> Dict[str, Any]:
 
 
 def update_last_donation_date(user_id: str, last_donated_at: str) -> None:
+    user_id = user_id.strip()
     last_donated_at = last_donated_at.strip()
     if not last_donated_at:
         parsed_date = None
@@ -364,12 +386,15 @@ def update_last_donation_date(user_id: str, last_donated_at: str) -> None:
             raise ValueError("Last donation date cannot be in the future.")
 
     connection = get_db_connection()
+    ensure_donor_schema(connection)
     cursor = connection.cursor()
     try:
         cursor.execute(
             "UPDATE donors SET last_donated_at = %s WHERE user_id = %s",
-            (parsed_date, user_id.strip()),
+            (parsed_date, user_id),
         )
+        if cursor.rowcount == 0:
+            raise ValueError("No donor record was found for this login.")
         connection.commit()
     finally:
         cursor.close()
