@@ -34,6 +34,37 @@
     </article>
 </section>
 
+<section class="card filter-card">
+    <h3>Filter donor records</h3>
+    <form method="get" class="filter-form">
+        <label>
+            Search user, name, phone, or Aadhar
+            <input type="search" name="search" value="{{ filters.search }}" placeholder="Enter specific donor data">
+        </label>
+        <label>
+            Blood group
+            <select name="blood_group">
+                <option value="">All blood groups</option>
+                {% for group in blood_group_options %}
+                    <option value="{{ group }}" {% if filters.blood_group == group %}selected{% endif %}>{{ group }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Donation availability
+            <select name="availability">
+                <option value="" {% if not filters.availability %}selected{% endif %}>All donors</option>
+                <option value="available" {% if filters.availability == 'available' %}selected{% endif %}>Available</option>
+                <option value="not_available" {% if filters.availability == 'not_available' %}selected{% endif %}>Not available</option>
+            </select>
+        </label>
+        <div class="filter-actions">
+            <button type="submit">Apply filters</button>
+            <a class="button-link secondary outline" href="{{ url_for('admin_dashboard') }}">Clear</a>
+        </div>
+    </form>
+</section>
+
 <section class="dashboard-grid">
     <article class="card">
         <h3>All donor records</h3>
@@ -51,6 +82,9 @@
                             <th>Weight</th>
                             <th>Phone</th>
                             <th>Bad habits</th>
+                            <th>Last donated</th>
+                            <th>Availability</th>
+                            <th>Next available</th>
                             <th>Address</th>
                             <th>Registered</th>
                         </tr>
@@ -67,6 +101,9 @@
                                 <td>{{ donor.weight }} kg</td>
                                 <td>{{ donor.phone_number }}</td>
                                 <td>{{ donor.bad_habits }}</td>
+                                <td>{{ donor.last_donated_at.strftime('%d %b %Y') if donor.last_donated_at and donor.last_donated_at.strftime is defined else 'Not updated' }}</td>
+                                <td><span class="status-pill {{ 'available' if donor.donation_status == 'Available' else 'not-available' }}">{{ donor.donation_status }}</span></td>
+                                <td>{{ donor.next_available_date.strftime('%d %b %Y') if donor.next_available_date and donor.next_available_date.strftime is defined else 'Now' }}</td>
                                 <td>{{ donor.address }}</td>
                                 <td>{{ donor.created_at.strftime('%d %b %Y') if donor.created_at.strftime is defined else donor.created_at }}</td>
                             </tr>

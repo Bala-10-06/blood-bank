@@ -88,3 +88,11 @@ http://127.0.0.1:5000
 
 - `.env` changes not loading
   - Stop and restart the Flask app after editing `.env`.
+
+## Existing database update for donation availability
+
+If you already created the database before the last-donation feature was added, run this once:
+
+```sql
+ALTER TABLE donors ADD COLUMN last_donated_at DATE NULL AFTER bad_habits;
+```
