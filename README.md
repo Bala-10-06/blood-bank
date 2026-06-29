@@ -41,6 +41,12 @@ The login form verifies the user by User ID and password. Successful users are r
    mysql -u root -p < schema.sql
    ```
 
+4. For a step-by-step SQL and run guide, see `SQL_RUN.md`.
+
+   ```bash
+   mysql -u root -p < schema.sql
+   ```
+
 4. Create your local environment file from the sample and update the values for your machine. The Flask app loads this `.env` file automatically at startup:
 
    ```bash
